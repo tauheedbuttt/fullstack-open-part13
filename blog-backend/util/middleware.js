@@ -1,4 +1,4 @@
-const { User } = require("../models");
+const { User, UserSession } = require("../models");
 const { SECRET } = require("./config");
 const jwt = require("jsonwebtoken");
 
@@ -38,6 +38,7 @@ const tokenExtractor = (req, res, next) => {
   if (authorization && authorization.toLowerCase().startsWith("bearer ")) {
     try {
       req.decodedToken = jwt.verify(authorization.substring(7), SECRET);
+      req.token = authorization.substring(7);
     } catch (err) {
       return res.status(401).json({ error: "token invalid" });
     }
@@ -49,7 +50,13 @@ const tokenExtractor = (req, res, next) => {
 
 const userExtractor = async (req, res, next) => {
   if (req.decodedToken) {
-    req.user = await User.findByPk(req.decodedToken.id);
+    req.user = await User.findOne({
+      where: { id: req.decodedToken.id, disabled: false },
+      include: { model: UserSession, where: { token: req.token } },
+    });
+    if (!req.user) {
+      return res.status(401).json({ error: "session invalid" });
+    }
   } else {
     return res.status(401).json({ error: "token missing or invalid" });
   }
