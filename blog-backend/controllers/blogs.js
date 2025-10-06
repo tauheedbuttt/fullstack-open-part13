@@ -2,6 +2,7 @@ const express = require("express");
 const blogRouter = express.Router();
 const { Blog, User } = require("../models");
 const { tokenExtractor, userExtractor } = require("../util/middleware");
+const { Op } = require("sequelize");
 
 const blogFinder = async (req, res, next) => {
   const user = req.user;
@@ -16,10 +17,24 @@ const blogFinder = async (req, res, next) => {
 };
 
 blogRouter.get("/", async (req, res) => {
+  const { search } = req.query;
+
+  const searchQuery = `%${search || ""}%`;
+
   const blogs = await Blog.findAll({
     attributes: { exclude: ["userId"] },
     order: [["likes", "DESC"]],
     include: { model: User, attributes: { exclude: ["id"] } },
+    where: {
+      [Op.or]: [
+        {
+          title: { [Op.iLike]: searchQuery },
+        },
+        {
+          author: { [Op.iLike]: searchQuery },
+        },
+      ],
+    },
   });
   res.json(blogs);
 });
